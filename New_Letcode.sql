@@ -35,3 +35,35 @@ GROUP BY activity_date
 
 --Notes: How to define user_activity
 -- How to use dateadd and datediff appropriatedly 
+
+--1050 
+SELECT actor_id,director_id
+FROM ActorDirector 
+GROUP BY actor_id,director_id
+HAVING COUNT(*)>=3
+
+--1126 Active Business 
+-- use windows function to do aggregation calculation 
+SELECT e.business_id
+FROM Events AS e
+JOIN (SELECT business_id, event_type, AVG (occurences) OVER (PARTITION BY event_type ) AS avg_occ FROM Events) AS a 
+ON e.business_id=a.business_id and a.event_type=e.event_type
+WHERE e.occurences> a.avg_occ
+GROUP BY e.business_id
+HAVING COUNT(e.event_type)>1
+
+--notes: need to understand which levels of comparison are we doing// use where or having 
+-- no typo 
+-- With define a subquery relation 
+
+WITH avg AS 
+(SELECT business_id, occurences, AVG(occurences) OVER(PARTITION BY event_type) AS avg_occurences
+FROM events)
+
+SELECT business_id 
+FROM avg
+WHERE occurences> avg_occurences
+GROUP BY business_id
+HAVING COUNT(*)>1;
+
+
