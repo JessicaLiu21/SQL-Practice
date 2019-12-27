@@ -174,3 +174,96 @@ ORDER BY a.id
 SELECT turn, SUM(weight)OVER(ORDER BY turn) AS subTotal
 FROM   Queue
 
+-- 1107
+--New User Daily Count 
+-- Need to pay attention where should we out the filter conditions 
+-- Within or out of the subquery
+SELECT  activity_date AS login_date,
+COUNT(DISTINCT user_id) AS user_count
+FROM (
+SELECT user_id, activity_date,
+row_number() over(PARTITION BY user_id ORDER BY activity_date ASC) AS date_rank 
+FROM traffic 
+WHERE activity = 'login'
+)
+AS A
+WHERE date_rank = 1
+AND activity_date 
+BETWEEN DATEADD(day, -90, '2019-06-30') AND '2019-06-30'
+GROUP BY activity_date
+
+-- If the problem allows us to use two statement, we could use CTE first.
+-- Try to think problme in MIN/MAX problem first then windows function
+WITH first_login AS 
+(SELECT DISTINCT user_id, MIN(activity_date) AS first_login
+FROM Traffic WHERE activity = 'login' GROUP BY user_id)
+
+SELECT f_login AS login_date, COUNT(user_id) AS user_count 
+FROM first_login 
+WHERE datediff(day,f_login, '2019-06-30')<=90
+GROUP BY f_login 
+
+
+--1212 Team Scores in Football Tournament 
+-- The ISNULL() function is used to replace NULL with the specified replacement value. This function contains only two arguments.
+-- Syntax  ISNULL (check_exp, change_value)
+
+-- the NULLIF function compares expression1 and expression2. 
+-- If expression1 and expression2 are equal, the NULLIF function returns NULL. 
+-- Otherwise, it returns the first expression which is expression1.
+SELECT Teams.team_id AS team_id, team_name, 
+isnull(sum(score),0) AS num_points
+FROM (
+SELECT host_team AS team_num,
+CASE WHEN host_goals > guest_goals THEN 3 
+WHEN host_goals = guest_goals THEN 1
+WHEN host_goals < guest_goals THEN 0
+END AS score FROM Matches 
+UNION ALL
+SELECT guest_team AS team_num,
+CASE WHEN host_goals > guest_goals THEN 0
+WHEN host_goals = guest_goals THEN 1
+WHEN host_goals < guest_goals THEN 3
+END AS score FROM Matches )
+AS A 
+RIGHT JOIN Teams 
+ON Teams.team_id = A.team_num
+GROUP BY Teams.team_id, team_name
+ORDER BY num_points DESC, Teams.team_id
+
+--1285
+--Classical Methods of calculating continuous variables 
+SELECT MIN(log_id) AS start_id, MAX(log_id) AS end_id
+FROM
+(
+SELECT log_id, row_number() OVER(ORDER BY log_id) AS rank
+FROM logs)
+AS A 
+GROUP BY log_id-rank
+
+--580 Count Student Number in Departments 
+-- Right Join AND ISNULL 
+SELECT dept_name, ISNULL(COUNT(DISTINCT student_id),0) AS student_number
+FROM student AS s
+RIGHT JOIN  department AS d
+ON s.dept_id = d.dept_id 
+GROUP BY dept_name
+ORDER BY student_number DESC, dept_name
+
+--1174  Immediate Food Delivery II 
+--The speed is not so fast, need to redo 
+/* Write your T-SQL query statement below */
+SELECT ROUND((SUM(deliver_state)*100.00/COUNT(*)),2)
+AS  immediate_percentage       
+FROM (
+SELECT CASE WHEN DATEDIFF(day,min_date,customer_pref_delivery_date) = 0 THEN 1
+ELSE 0
+END AS deliver_state
+FROM(
+SELECT customer_id, min(order_date) AS min_date
+FROM delivery
+GROUP BY customer_id
+) AS A JOIN delivery 
+ON delivery.order_date = A.min_date
+AND delivery.customer_id = A.customer_id
+)  AS B
