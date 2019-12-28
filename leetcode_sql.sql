@@ -267,3 +267,17 @@ GROUP BY customer_id
 ON delivery.order_date = A.min_date
 AND delivery.customer_id = A.customer_id
 )  AS B
+
+-- 1270 All Peaple Report to the Given Manager 
+-- 想好 连接链条的顺序， 然后再想filter 条件
+SELECT DISTINCT E1.employee_id 
+FROM 
+Employees AS E1
+JOIN Employees AS E2
+ON (E2.employee_id = E1.manager_id)
+AND (E1.Employee_id != 1)
+JOIN Employees AS E3
+ON (E3.employee_id = E2.manager_id )
+WHERE E1.manager_id = 1
+OR E2.manager_id = 1
+OR E3.manager_id = 1
