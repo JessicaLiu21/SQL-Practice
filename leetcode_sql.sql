@@ -281,3 +281,74 @@ ON (E3.employee_id = E2.manager_id )
 WHERE E1.manager_id = 1
 OR E2.manager_id = 1
 OR E3.manager_id = 1
+
+-- 1264  Page Recommendatio 
+-- 注意什么时候where的condition是OR，什么时候用什么筛选条件
+SELECT  DISTINCT L.page_id AS recommended_page
+FROM Friendship AS F 
+JOIN Likes AS L
+ON( F.user2_id = L.user_id 
+OR F.user1_id = L.user_id )
+WHERE
+(F.user1_id =1 
+OR F.user2_id = 1)
+AND L.page_id NOT IN (SELECT page_id FROM Likes where user_id =1)
+
+--1193 Monthly Transactions I 
+-- 日期的提取方式/ 用case when 有条件的进行aggregation 
+
+SELECT left(trans_date, 7) as month, 
+country, 
+COUNT(*) AS trans_count,
+SUM(CASE WHEN state = 'approved' THEN 1 ELSE 0 end) AS approved_count,
+SUM(amount) AS trans_total_amount,
+SUM(CASE WHEN state = 'approved' THEN amount ELSE 0 end) AS approved_total_amount
+FROM Transactions 
+GROUP BY left(trans_date, 7), country 
+
+/*
+cast(YEAR(trans_date) as varchar) + '-' + cast(Month(trans_date) as varchar) AS month
+*/
+-- 这种方式也可以提取年和月，但是结果是2019-1这样。不如left写法来的高效
+
+
+-- 1205 Monthly Transactions II
+-- 用CTE分别写，然后再用case when来合并
+-- 用CTE分别写的时候只管自己的条件/ CTE用自己的CASE WHEN的时候注意考虑结果是否要保0
+-- 注意join/ right join/ full join不同的使用情况
+WITH CTE1 
+AS 
+(SELECT left(T.trans_date, 7) as month, 
+country, 
+--SUM(CASE WHEN state = 'approved' THEN 1 ELSE 0 end) AS approved_count,
+--SUM(CASE WHEN state = 'approved' THEN amount ELSE 0 end) AS approved_amount
+count(*) as approved_count,
+sum(amount) as approved_amount
+FROM Transactions AS T
+WHERE T.state = 'approved'
+GROUP BY left(T.trans_date, 7), country  
+)
+,CTE2 
+AS 
+(SELECT left(C.trans_date, 7) as month, 
+country, 
+COUNT(DISTINCT C.trans_id ) AS chargeback_count,
+SUM( amount) AS chargeback_amount
+FROM Transactions AS T
+RIGHT JOIN Chargebacks AS C 
+ON T.id = C.trans_id 
+GROUP BY left(C.trans_date, 7), country 
+)
+
+SELECT CASE WHEN C1.month is not null THEN C1.month ELSE C2.month END AS month,
+CASE WHEN C1.country is not null THEN C1.country ELSE C2.country END AS country,
+ISNULL(C1.approved_count,0) AS approved_count,
+ISNULL(C1.approved_amount,0) AS approved_amount,
+ISNULL(C2.chargeback_count,0) AS chargeback_count,
+ISNULL(C2.chargeback_amount,0) AS chargeback_amount
+FROM CTE1  AS C1 
+FULL OUTER JOIN 
+CTE2 AS C2
+ON C1.month = C2.month 
+AND C1.country = C2.country
+ORDER BY Month 
