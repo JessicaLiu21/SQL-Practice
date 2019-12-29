@@ -352,3 +352,57 @@ CTE2 AS C2
 ON C1.month = C2.month 
 AND C1.country = C2.country
 ORDER BY Month 
+
+
+--1164 Product Price at a Given Date 
+-- windows function 复杂嵌套
+SELECT distinct  P.product_id,
+CASE WHEN  B.change_date <='2019-08-16' THEN B.new_price
+ELSE 10 
+END AS price
+FROM 
+(SELECT * FROM (
+SELECT *, row_number() OVER (PARTITION BY product_id ORDER BY change_date DESC) AS date_rank 
+FROM Products 
+WHERE change_date < = '2019-08-16') AS A
+WHERE A.date_rank = 1
+) AS B 
+RIGHT JOIN products AS P
+ON B.product_id = P.product_id 
+
+-- CTE和各种Join 
+with t1 as (
+    select product_id, max(change_date) as close_date
+    from Products
+    where change_date<='2019-08-16'
+    group by product_id)
+
+select t2.product_id,
+		max(case when t2.change_date = t1.close_date then new_price
+			when t1.close_date is null then 10
+			else null end) as price
+from Products t2
+	left join t1
+	on t2.product_id = t1.product_id
+group by t2.product_id
+
+--1149 Article Views II
+-- 不要把问题想的太复杂
+-- 复杂版
+SELECT DISTINCT B.viewer_id AS id
+FROM 
+(
+SELECT A.view_date, A.viewer_id 
+FROM 
+(SELECT DISTINCT article_id, author_id, viewer_id, view_date
+FROM Views) AS A 
+GROUP BY A.view_date, A.viewer_id
+HAVING COUNT(DISTINCT A.article_id)>1
+) AS B 
+
+--简易版
+SELECT   DISTINCT viewer_id AS id
+FROM     Views 
+GROUP BY viewer_id, view_date
+HAVING   COUNT(DISTINCT article_id)  >1
+ORDER BY viewer_id ASC
