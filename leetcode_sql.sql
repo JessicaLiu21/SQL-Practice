@@ -406,3 +406,20 @@ FROM     Views
 GROUP BY viewer_id, view_date
 HAVING   COUNT(DISTINCT article_id)  >1
 ORDER BY viewer_id ASC
+
+-- 1158 Market Analysis I 
+-- 注意筛选条件到底是having level的还是where level的
+-- 注意最后的result到底是left join哪边 
+-- 如果想不清楚就拆分着来 不要一次解决多个问题
+SELECT A.user_id AS buyer_id, A.join_date,ISNULL(B.orders_count, 0) AS orders_in_2019
+FROM
+(SELECT DISTINCT U.user_id ,U.join_date
+FROM Users AS U) AS A 
+LEFT JOIN 
+(SELECT O.buyer_id,
+COUNT(DISTINCT O.order_id) AS orders_count
+FROM Orders AS O
+WHERE O.order_date BETWEEN ' 2019-01-01'  AND '2019-12-31'
+GROUP BY O.buyer_id) AS B
+ON A.user_id = B. buyer_id
+
