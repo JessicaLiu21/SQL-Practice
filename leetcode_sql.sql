@@ -423,3 +423,20 @@ WHERE O.order_date BETWEEN ' 2019-01-01'  AND '2019-12-31'
 GROUP BY O.buyer_id) AS B
 ON A.user_id = B. buyer_id
 
+--1112 Highest Grade For Each Student
+--?? how to write this without windows function 
+SELECT student_id, course_id, grade FROM 
+(
+SELECT  student_id, course_id, grade, 
+row_number() OVER(PARTITION BY student_id ORDER BY grade DESC, course_id ASC)
+AS rank
+FROM Enrollments  
+) AS A 
+WHERE rank =1 
+ORDER BY student_id
+
+-- 1308 Running Total for Different Genders 
+-- 累计求和
+SELECT gender, day, SUM(score_points) OVER(PARTITION BY gender ORDER BY day) AS total 
+FROM Scores 
+ORDER BY gender, day 
