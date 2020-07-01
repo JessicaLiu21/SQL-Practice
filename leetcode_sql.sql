@@ -440,3 +440,181 @@ ORDER BY student_id
 SELECT gender, day, SUM(score_points) OVER(PARTITION BY gender ORDER BY day) AS total 
 FROM Scores 
 ORDER BY gender, day 
+
+--578 Get Highest Answer Rate Question
+-- method 1 (brute forth)
+SELECT C.question_id AS survey_log
+FROM
+(SELECT TOP 1 A.question_id, (answer_count*1.00/show_count) AS max_ratio
+FROM (
+SELECT question_id, COUNT(answer_id) AS answer_count
+FROM survey_log 
+WHERE answer_id IS NOT NULL
+GROUP BY question_id) A
+JOIN 
+(SELECT question_id, COUNT(*) AS show_count 
+FROM survey_log 
+GROUP BY question_id
+) B 
+ON A.question_id = B.question_id 
+ORDER BY max_ratio DESC) AS C
+
+--method 2
+SELECT TOP 1 question_id as survey_log
+FROM(
+SELECT question_id,
+SUM(case when answer_id is not null THEN 1 ELSE 0 END) as num_answer,
+count(*)  as num_show  
+FROM survey_log
+GROUP BY question_id
+) as tbl
+ORDER BY (num_answer*1.00 / num_show) DESC
+
+-- 计算七日留存
+SELECT user_id, login_time, first_login, date_diff(login_time,first_login) AS by_day
+FROM user_info AS U  LEFT JOIN (
+SELECT user_id, login_time, rank as first_login FROM(
+SELECT user_id, login_time, row_number() over(partition by user_id order by login_time ASC) AS rank 
+FROM user_info) --先排序找到最小登陆日期
+WHERE rank = 1 ) AS A 
+ON U.user_id = A.user_id --和原表链接一起来计算date diff 
+ORDER BY user_id, login_time 
+
+
+SELECT C.first_login,(C.reten_user*1.00/C.all_user) AS retention_rate 
+FROM
+(SELECT first_login, COUNT(DISTINCT user_id) AS all_user
+FROM B 
+GROUP BY first_login  
+) AS C JOIN
+(SELECT first_login, by_day, COUNT(DISTINCT user_id ) AS reten_user
+FROM B 
+GROUP BY first_login, by_day) D
+ON C.first_login = D.first_login 
+
+-- 防欺诈模型
+SELECT A.user_id, COUNT(*) AS view_count
+FROM 
+(SELECT user_id, time, ROW_NUMBER() OVER( PARTITION BY user_id ORDER BY time) 
+AS rank FROM table ) AS A
+JOIN 
+(SELECT user_id, time, ROW_NUMBER() OVER( PARTITION BY user_id ORDER BY time) 
+AS rank FROM table ) AS B 
+ON A.user_id = B.user_id 
+AND  A.rank = B.rank+1
+AND A.time - B.time <= 3
+GROUP BY A.user_id 
+
+--求组内累计值，组内总计值
+SUM(sales) OVER(ORDER BY day) AS  --日累计销售金额
+SUM(sales) OVER(PARTITION BY day ORDER BY day) AS --日总计额
+
+SELECT A.day, SUM(A.money) AS continuous_money 
+FROM A JOIN B ON A.Day >= B.Day 
+GROUP BY A.day 
+ORDER BY A.day 
+
+--连续的
+SELECT DISTINCT num AS ConsecutiveNums 
+FROM (SELECT id, num, LAG(num) OVER(order by id) AS before),
+             LEAD(num) OVER(order by id) AS after )
+             FROM logs)
+WHERE num = before and before= after 
+
+-- python container 
+class Solution:
+    def maxArea(self, height: List[int]) -> int:
+        water = 0 
+        head = 0
+        tail = len(height) - 1
+        for num in range(len(height)):
+            width = abs(head - tail)
+
+            if height[head]<height[tail]:
+                res = width * height[head]
+                head +=1
+            else:
+                res = width * height [tail]
+                tail -=1
+                
+            if res > water:
+                water = res 
+        return water 
+
+-- 177 Nth Highest Salary 
+CREATE FUNCTION getNthHighestSalary(@N INT) RETURNS INT AS
+BEGIN
+    RETURN (
+        /* Write your T-SQL query statement below. */
+        SELECT DISTINCT salary
+        FROM (SELECT salary,
+              DENSE_RANK() OVER (ORDER BY salary DESC) AS rank
+              FROM employee) t
+        WHERE t.rank = @N
+        
+    );
+END     
+
+-- 262 Hard -- Trips and Users 
+--
+
+
+(select request_at as day, 
+       round(sum(case
+            when status = 'completed' then 0
+            else 1
+           end)*1.0/
+       count(*), 2) as "cancellation rate"
+from trips
+where client_id in (select users_id from users where banned='No') 
+and driver_id in (select users_id from users where banned='No') 
+and request_at between '2013-10-01' and '2013-10-03'
+group by request_at
+) 
+-- wHY THIS IS NOT CORRECT 
+SELECT  A.request_at AS Day,ROUND(SUM(CASE WHEN A.status ='completed' THEN 0 ELSE 1 END)*1.0/ COUNT(*),2) AS [Cancellation Rate]
+FROM 
+(SELECT client_id  AS id , status, request_at
+FROM trips
+WHERE request_at BETWEEN '2013-10-01' AND '2013-10-03'
+UNION 
+SELECT driver_id  AS id , status, request_at
+FROM trips
+WHERE request_at BETWEEN '2013-10-01' AND '2013-10-03') A
+JOIN 
+(SELECT users_id, Role
+FROM users 
+WHERE banned = 'No') B
+ON A.id = B.users_id 
+GROUP BY A.request_at
+
+--1341 Movie_Rating 
+-- union only union differen
+-- union all also union duplicates 
+-- when the original data type before aggregate function is int, the output of the aggregate function is also int 
+-- If we need to compare, we need to make it into decimal
+SELECT results FROM (
+SELECT TOP 1 U.name AS results 
+FROM Users AS U 
+JOIN Movie_Rating AS MR
+ON U.user_id = MR.user_id 
+GROUP BY U.name 
+ORDER BY COUNT(DISTINCT movie_id) DESC, U.name ASC ) A
+UNION
+SELECT results FROM (
+SELECT TOP 1 M.title AS results
+FROM movies AS M  
+JOIN Movie_Rating AS MR
+ON M.movie_id = MR.movie_id 
+WHERE created_at BETWEEN '2020-02-01' AND '2020-02-29'
+GROUP BY M.title 
+ORDER BY SUM(MR.rating)*1.0/COUNT(M.movie_id) desc, M.title ASC ) B
+ORDER BY results
+
+--Problems????????
+SELECT M.title AS results,SUM(MR.rating)/COUNT(M.movie_id), AVG(MR.rating), SUM(MR.rating)*1.0/COUNT(M.movie_id)
+FROM movies AS M  
+JOIN Movie_Rating AS MR
+ON M.movie_id = MR.movie_id 
+WHERE created_at BETWEEN '2020-02-01' AND '2020-02-29'
+GROUP BY M.title 
